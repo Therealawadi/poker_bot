@@ -155,3 +155,28 @@ def test_river_can_bluff_an_observed_frequent_folder():
     action = model._river_action(GameStateView(state), 1, 0.10, 0.0)
     assert action.kind == 'raise'
     state.validate_action(action)
+
+
+@pytest.mark.parametrize('hole,board,expected', [
+    ('6H 7D', '3C 4S 5D', 0.0),
+    ('6H 7D', '4C 5S KD', 0.07),
+    ('6H 8D', '4C 5S KD', 0.07),
+    ('AH 2D', '3C 4S KD', 0.07),
+    ('AH KD', '4C 5S 6D 7H', 0.0),
+    ('AH 2H', '4H 9H KC', 0.13),
+])
+def test_draws_require_unmade_hand_and_hole_card_contribution(hole, board, expected):
+    from poker_strength import draw_potential
+    assert draw_potential(ids(hole), ids(board)) == pytest.approx(expected)
+
+
+def test_river_selects_best_size_even_when_last_increment_is_small():
+    model = make_model('AS KS')
+    state = river_state('QS JS TS 2C 3D')
+    state.set_stack(0, 61)
+    state.set_stack(1, 61)
+    model.profiles['them'].update(pre=100, faced=100, folds=0, pfr=0)
+    action = model._river_action(GameStateView(state), 1, 1.0, 0.9)
+    assert action.kind == 'raise'
+    assert action.amount == 61
+    state.validate_action(action)

@@ -208,6 +208,8 @@ class Model:
                     total += weight
                     cdf.append(total)
             distributions.append((hands, cdf, total))
+        if any(total <= 0 for _, _, total in distributions):
+            return 0.0  # no possible hand left for someone: nothing to sample
         if len(board) == 5 and len(opponents) == 1:
             # On the river heads-up equity can be exact, including all ties.
             mine = rank_hand(self.hole + tuple(board))
@@ -292,6 +294,7 @@ class Model:
             sizes.add(min(cap, max(low, int(state.current_bet + fraction * (pot + call)))))
         if equity > 0.90 or station:
             sizes.add(cap)
+        minimum_bet_ev = best_ev + max(0.025 * pot, 0.20 * state.big_blind)
         for total in sorted(sizes):
             cost = total - state.bets[me]
             other_cost = min(state.stacks[opponent], total - state.bets[opponent])
@@ -311,7 +314,7 @@ class Model:
                 ev += weight * ((1 - response) * pot + response * called_ev)
             ev /= total_weight
             # Demand an edge to offset uncertainty in predicted calls/folds.
-            if ev > best_ev + max(0.025 * pot, 0.20 * state.big_blind):
+            if ev > minimum_bet_ev and ev > best_ev:
                 best_ev = ev
                 best = PlayerAction.raise_to(me, total)
         return best
@@ -345,7 +348,7 @@ class Model:
         if len(opponents) == 1:
             effective_pot -= max(0, state.bets[opponents[0]] - state.bets[me] - call)
         odds = call / max(1, effective_pot + call)
-        all_in_call = call == state.stacks[me] or all(state.stacks[p] == 0 for p in opponents)
+        all_in_call = call >= state.stacks[me] or all(state.stacks[p] == 0 for p in opponents)
         # Future betting reduces realization for weak hands out of position.
         margin = 0.015 if all_in_call or state.street == "river" else 0.035
         if not in_position and not all_in_call:

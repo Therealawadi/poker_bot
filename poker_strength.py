@@ -104,5 +104,12 @@ def draw_potential(hand, board):
         mask |= 1 << (card // 4)
     flush = any(suits[c % 4] == 4 for c in hand)
     windows = [31 << i for i in range(9)] + [4111]
-    straight = any((mask & window).bit_count() == 4 for window in windows)
+    board_mask = 0
+    for card in board:
+        board_mask |= 1 << (card // 4)
+    # Only unmade draws with a rank contributed by our hole cards count.
+    straight = not STRAIGHTS[mask] and any(
+        (mask & window).bit_count() == 4 and (mask & window & ~board_mask)
+        for window in windows
+    )
     return 0.13 * flush + 0.07 * straight
